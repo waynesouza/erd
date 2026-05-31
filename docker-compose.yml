@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: diagram
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:6
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  erd-core:
+    build: ./erd-core
+    depends_on:
+      - postgres
+      - mongo
+    restart: on-failure
+    environment:
+      SPRING_APPLICATION_JSON: >-
+        {
+          "spring.datasource.url": "jdbc:postgresql://postgres:5432/diagram",
+          "spring.datasource.username": "root",
+          "spring.datasource.password": "root",
+          "spring.datasource.driver-class-name": "org.postgresql.Driver",
+          "spring.jpa.hibernate.ddl-auto": "update",
+          "spring.jpa.show-sql": "true",
+          "spring.data.mongodb.uri": "mongodb://root:root@mongo:27017/local?authSource=admin",
+          "erd.app.jwt.secret": "1b4e92769871538c645e4145c964173046e015f55fb706a5c49b8f0c2c183daf",
+          "erd.app.jwt.expiration": "3600000",
+          "erd.app.jwt.refresh-expiration": "2629746000",
+          "erd.app.jwt.cookie-name": "erd-token",
+          "erd.app.jwt.refresh-cookie-name": "erd-refresh-token"
+        }
+    ports:
+      - "8080:8080"
+    volumes:
+      - maven_cache:/root/.m2
+
+  erd-client:
+    build: ./erd-client
+    depends_on:
+      - erd-core
+    restart: always
+    ports:
+      - "4200:80"
+
+volumes:
+  postgres_data:
+  mongo_data:
+  maven_cache:
